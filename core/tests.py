@@ -1,3 +1,7 @@
 from django.test import TestCase
 
-# Create your tests here.
+from django.test import TestCase
+
+class BasicTest(TestCase):
+    def test_environment_is_sane(self):
+        self.assertEqual(1 + 1, 2)
