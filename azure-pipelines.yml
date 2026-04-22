@@ -5,7 +5,10 @@ pool:
   vmImage: "ubuntu-latest"
 
 variables:
-  DJANGO_SETTINGS_MODULE: "my_project.settings"
+  # Updated to match your new folder name
+  DJANGO_SETTINGS_MODULE: "myproject.settings"
+  # This variable triggers the SQLite database switch in your settings.py
+  AZURE_PIPELINES: "true"
 
 steps:
   - task: UsePythonVersion@0
@@ -25,12 +28,11 @@ steps:
 
   - script: |
       source venv/bin/activate
-      # This checks if you forgot to create migrations for model changes
+      # This fails if you changed models but didn't run makemigrations
       python manage.py makemigrations --check --dry-run
     displayName: "3. Verify Pending Migrations"
 
   - script: |
       source venv/bin/activate
-      # This runs your tests (if you have any)
       python manage.py test
     displayName: "4. Run Unit Tests"
