@@ -1,0 +1,36 @@
+trigger:
+  - main
+
+pool:
+  vmImage: "ubuntu-latest"
+
+variables:
+  DJANGO_SETTINGS_MODULE: "my_project.settings"
+
+steps:
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: "3.12"
+
+  - script: |
+      python -m venv venv
+      source venv/bin/activate
+      pip install -r requirements.txt
+    displayName: "1. Install Dependencies"
+
+  - script: |
+      source venv/bin/activate
+      python manage.py check
+    displayName: "2. Django System Check"
+
+  - script: |
+      source venv/bin/activate
+      # This checks if you forgot to create migrations for model changes
+      python manage.py makemigrations --check --dry-run
+    displayName: "3. Verify Pending Migrations"
+
+  - script: |
+      source venv/bin/activate
+      # This runs your tests (if you have any)
+      python manage.py test
+    displayName: "4. Run Unit Tests"
