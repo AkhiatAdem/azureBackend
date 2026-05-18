@@ -1,21 +1,51 @@
 import string
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import Movie, Room, Seat, Screening, Ticket
+from .models import Movie, Room, Seat, Screening, Ticket, Genre, Profile
+
+class ProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Profile
+        fields = ['role', 'membership_type', 'monthly_credits']
 
 class UserSerializer(serializers.ModelSerializer):
+    email = serializers.EmailField(required=True)
+    role = serializers.CharField(source='profile.role', read_only=True)
+    membership_type = serializers.CharField(source='profile.membership_type', read_only=True)
+    monthly_credits = serializers.IntegerField(source='profile.monthly_credits', read_only=True)
+
     class Meta:
         model = User
-        fields = ['id', 'username', 'password', 'is_staff']
+        fields = ['id', 'username', 'email', 'password', 'is_staff', 'role', 'membership_type', 'monthly_credits']
         extra_kwargs = {'password': {'write_only': True}}
 
+    def validate_email(self, value):
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("A user with this email already exists.")
+        return value
+
     def create(self, validated_data):
-        return User.objects.create_user(**validated_data)
+        user = User.objects.create_user(**validated_data)
+        user.is_active = False # Require email verification
+        user.save()
+        return user
+
+class GenreSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Genre
+        fields = '__all__'
 
 class MovieSerializer(serializers.ModelSerializer):
+    genres = serializers.PrimaryKeyRelatedField(many=True, queryset=Genre.objects.all(), required=False)
+
     class Meta:
         model = Movie
         fields = '__all__'
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        representation['genres_info'] = GenreSerializer(instance.genres.all(), many=True).data
+        return representation
 
 class SeatSerializer(serializers.ModelSerializer):
     class Meta:
@@ -29,7 +59,7 @@ class RoomSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Room
-        fields = ['id', 'name', 'seats', 'rows_count', 'seats_per_row']
+        fields = ['id', 'name', 'seats', 'rows_count', 'seats_per_row', 'rows', 'cols']
 
     def create(self, validated_data):
         rows = validated_data.pop('rows_count')
@@ -48,22 +78,39 @@ class RoomSerializer(serializers.ModelSerializer):
 
 class ScreeningSerializer(serializers.ModelSerializer):
     movie_title = serializers.ReadOnlyField(source='movie.title')
+    movie_genre = serializers.SerializerMethodField()
     poster_url = serializers.ReadOnlyField(source='movie.poster_url')
     duration = serializers.ReadOnlyField(source='movie.duration_minutes')
     room_name = serializers.ReadOnlyField(source='room.name')
     end_time = serializers.ReadOnlyField()
     booked_seats = serializers.SerializerMethodField()
+    total_seats = serializers.SerializerMethodField()
+    price = serializers.DecimalField(max_digits=10, decimal_places=2, source='base_price', read_only=True)
 
     class Meta:
         model = Screening
         fields = [
-            'id', 'movie', 'movie_title', 'poster_url', 'duration', 
-            'room', 'room_name', 'date', 'start_time', 'end_time', 'booked_seats'
+            'id', 'movie', 'movie_title', 'movie_genre', 'poster_url', 'duration', 
+            'room', 'room_name', 'date', 'start_time', 'end_time', 'booked_seats', 'total_seats', 'base_price', 'price'
         ]
+
+    def to_internal_value(self, data):
+        if 'base_price' not in data and 'price' in data:
+            data = data.copy()
+            data['base_price'] = data['price']
+        return super().to_internal_value(data)
 
     def get_booked_seats(self, obj):
         booked_ids = obj.tickets.values_list('seats', flat=True).filter(seats__isnull=False).distinct()
         return list(booked_ids)
+
+    def get_total_seats(self, obj):
+        return obj.room.seats.count()
+
+    def get_movie_genre(self, obj):
+        if not hasattr(obj, 'movie') or not obj.movie:
+            return ""
+        return ", ".join(g.name for g in obj.movie.genres.all())
 
 class TicketSerializer(serializers.ModelSerializer):
     user_username = serializers.ReadOnlyField(source='user.username')
@@ -75,8 +122,8 @@ class TicketSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Ticket
-        fields = ['id', 'user', 'user_username', 'screening', 'screening_date', 'movie_title', 'room_name', 'seats', 'seat_labels', 'booked_at']
-        read_only_fields = ['user']
+        fields = ['id', 'user', 'user_username', 'screening', 'screening_date', 'movie_title', 'room_name', 'seats', 'seat_labels', 'booked_at', 'price_paid']
+        read_only_fields = ['user', 'price_paid']
 
     def get_seat_labels(self, obj):
         return [f"{s.row_label}{s.number}" for s in obj.seats.all()]

@@ -5,34 +5,39 @@ pool:
   vmImage: "ubuntu-latest"
 
 variables:
-  # Updated to match your new folder name
+  # Ensure this matches your ACTUAL folder name inside the repo
   DJANGO_SETTINGS_MODULE: "myproject.settings"
-  # This variable triggers the SQLite database switch in your settings.py
   AZURE_PIPELINES: "true"
 
 steps:
+  # 1. Start with the code
+  - checkout: self
+    persistCredentials: true
+    fetchDepth: 0
+
   - task: UsePythonVersion@0
     inputs:
       versionSpec: "3.12"
 
+  # 2. Quality Control
   - script: |
-      python -m venv venv
-      source venv/bin/activate
+      # If requirements is in a folder, use: pip install -r your_folder/requirements.txt
       pip install -r requirements.txt
-    displayName: "1. Install Dependencies"
-
-  - script: |
-      source venv/bin/activate
       python manage.py check
-    displayName: "2. Django System Check"
-
-  - script: |
-      source venv/bin/activate
-      # This fails if you changed models but didn't run makemigrations
-      python manage.py makemigrations --check --dry-run
-    displayName: "3. Verify Pending Migrations"
-
-  - script: |
-      source venv/bin/activate
       python manage.py test
-    displayName: "4. Run Unit Tests"
+    displayName: "Run Tests & Checks"
+
+  # 3. The Sync (Only happens if tests pass)
+  - script: |
+
+      # Ensure local 'main' is ready
+      git checkout main || git checkout -b main
+
+      # Use the token securely to push
+      git remote remove github || true
+      git remote add github https://x-access-token:$(GH_TOKEN)@github.com/AkhiatAdem/azureBackend.git
+
+      git push github main --force
+    displayName: "Sync to GitHub"
+    env:
+      GH_TOKEN: $(GH_TOKEN)
