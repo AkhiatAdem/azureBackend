@@ -83,12 +83,12 @@ import os
 
 # Check if we are running in the Azure CI environment
 
-    DATABASES = {
+DATABASES = {  
     'default': dj_database_url.config(
         default=database_url,
         conn_max_age=600
     )
-    }
+}
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
