@@ -15,7 +15,7 @@ import os
 import dj_database_url
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
+database_url = os.environ.get('DATABASE_URL', f'sqlite:///{os.path.join(BASE_DIR, "db.sqlite3")}')
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
@@ -85,11 +85,10 @@ import os
 if os.environ.get('AZURE_PIPELINES') == 'true':
     DATABASES = {
     'default': dj_database_url.config(
-        # This reads the environment variable from Render
-        default=os.environ.get('DATABASE_URL'),
+        default=database_url,
         conn_max_age=600
     )
-}
+    }
 else:
     DATABASES = {
         'default': {
