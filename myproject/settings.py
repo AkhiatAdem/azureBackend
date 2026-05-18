@@ -82,23 +82,12 @@ WSGI_APPLICATION = 'myproject.wsgi.application'
 import os
 
 # Check if we are running in the Azure CI environment
-if os.environ.get('AZURE_PIPELINES') == 'true':
+
     DATABASES = {
     'default': dj_database_url.config(
         default=database_url,
         conn_max_age=600
     )
-    }
-else:
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': 'pfefr',
-            'USER': 'pfeuser',
-            'PASSWORD': '1234',
-            'HOST': 'localhost',
-            'PORT': '5432',
-        }
     }
 
 REST_FRAMEWORK = {
