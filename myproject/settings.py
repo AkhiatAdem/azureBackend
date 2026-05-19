@@ -80,16 +80,26 @@ WSGI_APPLICATION = 'myproject.wsgi.application'
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
 import os
-
+IS_TESTING = 'test' in sys.argv or os.environ.get('AZURE_HTTP_USER_AGENT') is not None
 # Check if we are running in the Azure CI environment
 
-DATABASES = {  
-    'default': dj_database_url.config(
-        default=database_url,
-        conn_max_age=0,
-        ssl_require=True
-    )
-}
+if IS_TESTING:
+    # Clean, isolated SQLite configuration for Azure builds/tests
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': ':memory:',  # Runs blazing fast entirely in RAM
+        }
+    }
+else:
+    # Production PostgreSQL configuration for Railway/Render
+    DATABASES = {
+        'default': dj_database_url.config(
+            default=os.environ.get('DATABASE_URL'),
+            conn_max_age=0,
+            ssl_require=True  # Safely kept only for your real cloud database
+        )
+    }
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
